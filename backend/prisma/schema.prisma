@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  CLIENT
+  FREELANCER
+}
+
+enum MilestoneStatus {
+  DRAFT
+  OPEN
+  SUBMITTED
+  UNDER_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  PAYMENT_PENDING
+  PAYMENT_FAILED
+  PAID
+}
+
+model User {
+  id           String @id @default(cuid())
+  name         String
+  email        String @unique
+  passwordHash String
+  role         Role
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  sessions     Session[]
+  ownedProjects Project[] @relation("ClientProjects")
+  assignments  Project[] @relation("FreelancerProjects")
+  submissions  Submission[]
+  approvals    Approval[]
+  auditLogs    AuditLog[]
+}
+
+model Session {
+  id        String @id @default(cuid())
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String @unique
+  csrfToken String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([userId, expiresAt])
+}
+
+model Project {
+  id           String @id @default(cuid())
+  title        String
+  description  String
+  requirements String
+  deliverables String
+  clientId     String
+  freelancerId String?
+  client       User @relation("ClientProjects", fields: [clientId], references: [id])
+  freelancer   User? @relation("FreelancerProjects", fields: [freelancerId], references: [id])
+  currency     String @default("USD")
+  budgetMinor  Int
+  status       String @default("ACTIVE")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  milestones   Milestone[]
+  auditLogs    AuditLog[]
+  @@index([clientId])
+  @@index([freelancerId])
+}
+
+model Milestone {
+  id                 String @id @default(cuid())
+  projectId          String
+  project            Project @relation(fields: [projectId], references: [id])
+  title              String
+  description        String
+  sequence           Int
+  amountMinor        Int
+  acceptanceCriteria Json
+  status             MilestoneStatus @default(OPEN)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  submissions        Submission[]
+  approvals          Approval[]
+  payment            Payment?
+  auditLogs          AuditLog[]
+  @@unique([projectId, sequence])
+}
+
+model Submission {
+  id             String @id @default(cuid())
+  milestoneId    String
+  milestone      Milestone @relation(fields: [milestoneId], references: [id])
+  freelancerId   String
+  freelancer     User @relation(fields: [freelancerId], references: [id])
+  description    String
+  githubUrl      String?
+  demoUrl        String?
+  evidenceNotes  String
+  revisionNumber Int
+  createdAt      DateTime @default(now())
+  evaluations    AiEvaluation[]
+  approvals      Approval[]
+  @@unique([milestoneId, revisionNumber])
+}
+
+model AiEvaluation {
+  id             String @id @default(cuid())
+  submissionId   String
+  submission     Submission @relation(fields: [submissionId], references: [id])
+  provider       String
+  model          String
+  assessmentJson Json
+  recommendation String
+  limitations    String
+  createdAt      DateTime @default(now())
+  @@index([submissionId, createdAt])
+}
+
+model Approval {
+  id           String @id @default(cuid())
+  milestoneId  String
+  milestone    Milestone @relation(fields: [milestoneId], references: [id])
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id])
+  clientId     String
+  client       User @relation(fields: [clientId], references: [id])
+  decision     String
+  notes        String
+  createdAt    DateTime @default(now())
+  payment      Payment?
+  @@index([milestoneId, createdAt])
+}
+
+model Payment {
+  id              String @id @default(cuid())
+  milestoneId     String @unique
+  milestone       Milestone @relation(fields: [milestoneId], references: [id])
+  approvalId      String @unique
+  approval        Approval @relation(fields: [approvalId], references: [id])
+  paypalOrderId   String? @unique
+  paypalCaptureId String? @unique
+  createRequestId String @unique
+  captureRequestId String @unique
+  amountMinor     Int
+  currency        String
+  status          String @default("CREATING")
+  createdAt       DateTime @default(now())
+  capturedAt      DateTime?
+  processingUntil DateTime?
+  @@index([status])
+}
+
+model AuditLog {
+  id           String @id @default(cuid())
+  actorId      String
+  actor        User @relation(fields: [actorId], references: [id])
+  projectId    String
+  project      Project @relation(fields: [projectId], references: [id])
+  milestoneId  String?
+  milestone    Milestone? @relation(fields: [milestoneId], references: [id])
+  eventType    String
+  metadataJson Json
+  createdAt    DateTime @default(now())
+  @@index([projectId, createdAt])
+}

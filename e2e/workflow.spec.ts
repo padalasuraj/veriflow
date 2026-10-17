@@ -1,0 +1,76 @@
+import { expect, test } from '@playwright/test';
+test.use({ actionTimeout: 10_000 });
+
+test('client and freelancer complete planning, revision, advisory review and approval', async ({ browser }) => {
+  test.setTimeout(120_000);
+  const suffix = Date.now().toString();
+  const clientContext = await browser.newContext();
+  const freelancerContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const client = await clientContext.newPage();
+  const freelancer = await freelancerContext.newPage();
+  const freelancerEmail = `freelancer-${suffix}@e2e.local`;
+  try {
+    for (const [page, role, email] of [[freelancer, 'FREELANCER', freelancerEmail], [client, 'CLIENT', `client-${suffix}@e2e.local`]] as const) {
+      await page.goto('http://localhost:5173/register');
+      await page.getByLabel('Full name').fill(role === 'CLIENT' ? 'E2E Client' : 'E2E Freelancer');
+      await page.getByLabel('Email', { exact: true }).fill(email);
+      await page.getByLabel('Password').fill('BrowserTest2026!');
+      await page.getByLabel('I am a').selectOption(role);
+      await page.getByRole('button', { name: 'Create account' }).click();
+      await expect(page.getByRole('heading', { name: /Hello/ })).toBeVisible();
+    }
+    await client.getByRole('link', { name: 'Create project' }).click();
+    await client.getByLabel('Project title').fill(`Browser website ${suffix}`);
+    await client.getByLabel('Project description').fill('Build an accessible studio website with responsive navigation.');
+    await client.getByLabel('Requirements', { exact: true }).fill('Responsive layouts and keyboard navigation.');
+    await client.getByLabel('Deliverables', { exact: true }).fill('Source, design and preview.');
+    await client.getByLabel('Freelancer email (optional)').fill(freelancerEmail);
+    await client.getByRole('button', { name: 'Create project', exact: true }).click();
+    await expect(client.getByRole('heading', { name: `Browser website ${suffix}` })).toBeVisible();
+    await client.getByRole('button', { name: 'Draft AI milestone plan' }).click();
+    await expect(client.getByText(/SIMULATED MOCK AI/)).toBeVisible();
+    await client.getByRole('button', { name: 'Save milestone', exact: true }).first().click();
+    await expect(client.getByText('Milestone saved. Review it in the agreement list above.')).toBeVisible();
+    await client.locator('.milestone-row').first().click();
+    const milestoneUrl = client.url();
+    await freelancer.goto(milestoneUrl);
+    await freelancer.getByLabel('What did you deliver?').fill('Delivered the responsive design with mobile and desktop screens.');
+    await freelancer.getByLabel('Evidence and reproduction notes').fill('Inspect the mobile and desktop frames. Keyboard navigation is described in the handover.');
+    await freelancer.getByRole('button', { name: 'Submit evidence' }).click();
+    await expect(freelancer.getByRole('heading', { name: 'Evidence · revision 1' })).toBeVisible();
+    await client.reload();
+    await client.getByRole('button', { name: 'Start review' }).click();
+    await client.getByRole('button', { name: 'Request AI evidence assessment' }).click();
+    await expect(client.getByRole('heading', { name: 'Evidence assessment' })).toBeVisible();
+    await expect(client.getByText(/No repository or live website was fetched/).first()).toBeVisible();
+    await client.getByLabel('Decision notes').fill('Please add contact form validation evidence.');
+    await client.getByRole('button', { name: 'Record client decision' }).click();
+    await expect(client.getByText('changes requested', { exact: true }).first()).toBeVisible();
+    await freelancer.reload();
+    await freelancer.getByLabel('What did you deliver?').fill('Added contact form validation evidence and revised designs.');
+    await freelancer.getByLabel('Evidence and reproduction notes').fill('Open the mobile form and submit an invalid email. The design shows inline validation.');
+    await freelancer.getByRole('button', { name: 'Submit evidence' }).click();
+    await expect(freelancer.getByRole('heading', { name: 'Evidence · revision 2' })).toBeVisible();
+    await client.reload();
+    await client.getByRole('button', { name: 'Start review' }).click();
+    await client.getByLabel('Decision', { exact: true }).selectOption('APPROVED');
+    await client.getByLabel('Decision notes').fill('I independently inspected the revised design and accept it.');
+    await client.getByRole('button', { name: 'Record client decision' }).click();
+    await expect(client.getByText(/Checkout unavailable: backend PayPal Sandbox credentials/)).toBeVisible();
+    await client.reload();
+    await expect(client.getByText('approved', { exact: true }).first()).toBeVisible();
+    await expect(client.getByRole('heading', { name: 'Evidence · revision 1' })).toBeVisible();
+    await client.getByRole('link', { name: 'Sandbox payments' }).click();
+    await expect(client.getByText('No Sandbox payment attempts yet.')).toBeVisible();
+    await freelancer.reload();
+    expect(await freelancer.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await client.getByRole('link', { name: 'Overview' }).click();
+    await client.screenshot({ path: 'test-results/client-dashboard.png', fullPage: true });
+    await client.getByRole('button', { name: 'Sign out' }).click();
+    await expect(client.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+    await client.getByLabel('Email', { exact: true }).fill(`client-${suffix}@e2e.local`);
+    await client.getByLabel('Password').fill('BrowserTest2026!');
+    await client.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(client.getByRole('heading', { name: /Hello/ })).toBeVisible();
+  } finally { await Promise.allSettled([clientContext.close(), freelancerContext.close()]); }
+});
