@@ -62,3 +62,16 @@ Configure keys privately using README, then follow AI_ENGINE.md and PAYPAL.md ac
 ### Fresh-server launch check
 A further run stopped the prior development runner and let Playwright start both services from its webServer configuration. The initial parallel cold-start run passed the full workflow but timed out in the health/checkout browser setup. The browser configuration now waits separately for API health and Vite, uses one worker to limit concurrent startup load, and allows a 60-second default timeout. The fresh-server rerun passed all three tests (28.2 seconds). Playwright started the services itself and completed its teardown. Root tool TypeScript and lint checks were rerun after the configuration change.
 
+
+## Reverification — October 21, 2026 (Asia/Kolkata)
+
+- `npm run lint`, `npm run typecheck`: passed (lint rerun after adding documentation scripts).
+- `npm test`: 3 frontend + 47 backend = **50 passing tests**.
+- `npm run build`: frontend Vite and backend TypeScript builds passed. Upstream Zod annotation warnings remain nonfatal.
+- `db:generate`, `db:migrate`, `db:seed`, `db:verify`: passed; existing data preserved.
+- `npm run test:e2e`: **3 passed in 10.2 seconds**, including two-user revisions, advisory review and client approval.
+- `npm run verify:built`: compiled API started on a temporary port and returned healthy.
+- `node scripts/capture-docs.mjs`: four real application screenshots captured in docs/images; project image visually inspected.
+- `node scripts/create-diagrams.mjs`: accessible workflow/architecture SVGs generated.
+
+External OpenAI/PayPal acceptance and hosted deployment remain unexecuted. Hosting configurations are preparation, not evidence of a deployed application. Earlier unpublished-source statements above are historical; see the final chat for current commit/push status.

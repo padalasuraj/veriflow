@@ -60,3 +60,25 @@ Evidence provenance and honest failure states matter as much as the happy path. 
 - [ ] Human review and submission through Devpost.
 
 User-supplied target: before November 13, 2026 at 1:30 AM IST. Confirm this against organizer rules. No external submission, publishing or video upload was performed.
+
+## Additional-info form: ready-to-review answers
+
+**Main technology requirement:** VeriFlow implements PayPal Sandbox Orders v2 with server-side OAuth, order creation, buyer approval through the PayPal JavaScript SDK, capture/reconciliation and strict capture identity, amount and currency checks. OpenAI Chat Completions structured outputs (default model gpt-4.1-mini) propose editable milestone plans and advisory evidence assessments. Clients retain approval authority. Current local verification uses explicitly labeled mock AI and controlled payment fixtures; complete actual provider acceptance before submitting a claim that both services were demonstrated.
+
+**Sponsor tools:** Select only tools actually used. A Render deployment configuration is supplied, but deployment has not been performed. Do not select Render or another sponsor solely because it appears in configuration or documentation. If no listed sponsor was used, select “None, used other AI tools.”
+
+**Public repository:** https://github.com/padalasuraj/veriflow
+
+**Working demo:** Enter the actual hosted URL after deployment, or explain the complete local setup in README where the form permits. Do not invent a hosted URL.
+
+**Judge testing:** Follow README setup; use local client/freelancer demo accounts only for local testing. On the hosted app, provide fresh judge accounts privately. Sandbox buyer credentials must be shared privately, never committed to the public repository. AI mocks and controlled checkout tests must be disclosed.
+
+**AI tools used in the product:** OpenAI Chat Completions structured-output adapter; default gpt-4.1-mini. Offline development uses a deterministic simulation. Verify actual model access before finalizing this answer. For AI tools used while developing, the submitter should list the development tools they actually used, including this coding assistant if applicable.
+
+**Learning draft:** We learned to translate an agreement into measurable criteria, preserve evidence revisions, constrain and validate AI outputs, keep financial authorization under human control, and reconcile payment uncertainty using durable request IDs and server-side checks. Typed APIs, relational constraints and browser tests helped connect the two roles into one consistent workflow.
+
+**Must be completed by the submitter:** submitter type, residence/province, organization, project creation history and changes since October 1, PayPal experience rating and personal feedback, permission for organizer contact, age/eligibility declarations, learning rating and career-value answer. These are personal attestations and cannot be inferred from the code.
+
+**Media:** Actual screenshots and workflow/architecture diagrams are in docs/images. Record real functioning app footage and upload a public YouTube video under three minutes. The repository contains a demo script, not a completed video.
+
+**Updated checklist:** Local tests/build and screenshots are complete. Provider acceptance, actual backend/frontend deployment, video upload, personal attestations and final Devpost submission remain outstanding. Historical publication notes above describe the earlier run; consult the final chat for the latest push outcome.

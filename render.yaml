@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: veriflow-api
+    runtime: node
+    plan: starter
+    buildCommand: npm ci && npm run db:generate && npm run build -w backend
+    startCommand: npm run db:migrate && npm start
+    healthCheckPath: /api/health
+    disk:
+      name: veriflow-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: file:/var/data/veriflow.db
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: AI_MODE
+        value: mock
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_MODEL
+        value: gpt-4.1-mini
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false

@@ -1,19 +1,80 @@
-﻿# Local and hosted deployment
+﻿# Deployment: Vercel / Netlify + persistent backend
 
-## Local Windows
+## Architecture
 
-Use Node 24 LTS. From root run npm.cmd install, copy backend/.env.example only when backend/.env is absent, then npm.cmd run db:generate, npm.cmd run db:migrate, npm.cmd run db:seed and npm.cmd run dev. Frontend: http://localhost:5173; backend: http://localhost:3001/api/health. Use localhost consistently for cookies/origin. Separate scripts are npm.cmd run dev -w backend and npm.cmd run dev -w frontend.
+Host the React frontend on Vercel or Netlify and the Express/SQLite API on a persistent Node host. Frontend `/api` proxy rules keep browser cookies on the frontend origin. The backend accepts one exact `FRONTEND_ORIGIN`; use separate backend instances for separate frontend installations.
 
-SQLite defaults to backend/prisma/dev.db. The CLI config resolves the same backend-relative path as the runtime adapter. Back up the database with SQLite-aware tooling before schema changes; never reset a user's database as a deployment step. Migration deployment is nondestructive and idempotent. Seeding preserves existing data and is local-only.
+SQLite needs a persistent disk and one backend instance. An ephemeral/serverless filesystem cannot preserve this application's records. The supplied Render Blueprint uses a paid Starter service and disk; review the plan before provisioning. No hosted service has been created or tested during this work.
 
-## Production build
+## 1. Backend
 
-Run npm.cmd run db:generate and npm.cmd run build. Artifacts: frontend/dist and backend/dist. npm.cmd start runs the compiled API from the backend working directory. It does not serve frontend assets. Keep Prisma/client/native dependencies available in the backend runtime; generate for the target platform and apply migrations before starting the API.
+Create a Render Blueprint from `render.yaml`, or configure an equivalent persistent Node service:
 
-A hosted setup needs HTTPS, a static server with SPA fallback to frontend/dist/index.html, and a same-origin /api reverse proxy to Express. Inject backend secrets through the host's private environment. Set NODE_ENV=production and FRONTEND_ORIGIN to the exact HTTPS origin. Secure __Host- cookies require TLS and Path=/ with no Domain. Configure a deployment-specific Content Security Policy permitting required PayPal script/frame/connect origins on the frontend host. No hosted deployment has been executed or verified.
+| Setting | Value |
+| --- | --- |
+| Root | Repository root |
+| Runtime | Node 24 |
+| Build | `npm ci && npm run db:generate && npm run build -w backend` |
+| Start | `npm run db:migrate && npm start` |
+| Health | `/api/health` |
+| Persistent disk | `/var/data` |
+| `DATABASE_URL` | `file:/var/data/veriflow.db` |
+| `NODE_ENV` | `production` |
+| `FRONTEND_ORIGIN` | Actual final frontend HTTPS origin, no trailing slash |
+| `PAYPAL_ENV` | `sandbox` |
 
-Use a persistent volume for SQLite and a single application instance until concurrency/operational testing justifies a different architecture. Do not use ephemeral hosting disks for financial/workflow records. Configure reliable backups, restore drills, health/uptime monitoring and private credential rotation. Test cookie/CSRF, buyer popup flow and browser deep links on the actual hosted origin. Do not seed public demo passwords into a public production instance.
+Migrations run at startup when the disk is available. They are nondestructive and idempotent; never reset a database as part of deployment. Use SQLite-aware backups and test restoration.
 
-The PayPal adapter accepts sandbox only. Production NODE_ENV does not mean live PayPal payments. Real OpenAI calls and Sandbox buyer capture still need explicit provider acceptance tests. There are no webhooks, refunds, escrow or freelancer payouts.
+Configure `AI_MODE=real`, `AI_API_KEY`, `AI_MODEL`, `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET` privately on the backend for external integrations. Keep `AI_MODE=mock` only for a visibly labeled simulation. The Blueprint defaults to mock. Secrets must never be put in frontend variables or routing files.
 
-Docker/cloud hosting is optional and not required. This run has not provisioned accounts, deployed a site or changed Git remotes. CI is configured but remote CI execution remains unverified.
+Open `https://your-api-host/api/health`. Configured integration labels do not prove provider acceptance. Do not seed public demo credentials into production; register fresh accounts through the hosted frontend.
+
+## 2. Configure routing before deployment
+
+Run from the repository root with your actual backend HTTPS origin:
+
+```powershell
+node scripts/configure-hosting.mjs https://your-api.onrender.com
+git add vercel.json netlify.toml
+git commit -m "Configure hosted VeriFlow API origin"
+git push origin main
+```
+
+The script validates the origin and updates both proxy files. Hosting routing is read before the build: this command must run before deploying. The initial `YOUR-BACKEND.example.invalid` target intentionally cannot serve requests.
+
+## 3. Vercel
+
+Import the repository using root `.`. Do not choose `frontend` as the project root.
+
+`vercel.json` sets Vite, install `npm ci`, build `npm run build -w frontend`, output `frontend/dist`. The first rewrite forwards `/api/:path*` to the backend; the final rewrite provides SPA deep-route fallback. Open `/api/health` through the frontend domain and test registration/login.
+
+## 4. Netlify
+
+Import the repository with repository root as base. `netlify.toml` sets Node 24, build `npm run build -w frontend`, publish `frontend/dist`. API proxy rules precede the SPA fallback. Open `/api/health` through the frontend domain and test registration/login.
+
+When changing the frontend domain, update backend `FRONTEND_ORIGIN` and restart. Preview origins need a matching dedicated backend configuration. Keep API rules ahead of the catch-all SPA rule so API requests never receive HTML.
+
+## Hosted acceptance checklist
+
+- Verify HTTPS, `/api/health` through the frontend and refresh of protected deep routes.
+- Register client/freelancer identities, sign out/in and verify CSRF-protected writes.
+- Create/assign a project, save milestones, submit/revise evidence, request AI review and record client decisions.
+- Run real AI requests and record actual model/results without secrets.
+- Complete Sandbox buyer approval/capture and compare receipt ID, amount and currency with the merchant dashboard.
+- Exercise cancellation and reconciliation; do not treat timeouts as proof that no charge occurred.
+- Restart/redeploy the backend and verify projects and receipts persist.
+- Check mobile layout and private-resource access from an unrelated account.
+- Configure backups, restore testing, monitoring and account support before broader use.
+
+No hosted or credential-backed provider acceptance was performed locally. `NODE_ENV=production` enables Secure cookies and requires HTTPS; it does not enable real PayPal money. There are no escrow, payouts, refunds or webhook features.
+
+## Local compiled API
+
+Run `npm run db:generate`, `npm run db:migrate`, `npm run build`, then `npm start`. Start launches only the compiled API. `npm run verify:built` starts it on a temporary port, verifies health and stops it. For interactive local use, run `npm run dev` and open http://localhost:5173.
+
+## Primary references
+
+- [Vercel rewrites](https://vercel.com/docs/routing/rewrites)
+- [Netlify rewrites/proxies](https://docs.netlify.com/manage/routing/redirects/rewrites-proxies/)
+- [Render persistent disks](https://render.com/docs/disks)
+- [Render Blueprint specification](https://render.com/docs/blueprint-spec)
