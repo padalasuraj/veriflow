@@ -4,6 +4,12 @@
 
 Built for the **PayPal AI Hackathon 2026** with React, TypeScript, Express, Prisma, SQLite, OpenAI structured outputs and PayPal Orders v2.
 
+## Flowchart 1: What the app is about
+
+This diagram connects the problem, the people using VeriFlow, and the outcome it provides. AI advises; the client makes the approval decision.
+
+![App purpose flowchart: unclear freelance deliverables lead to a shared client, AI and freelancer workspace, human-approved Sandbox checkout and traceable records](docs/images/app-purpose-flowchart.svg)
+
 ![VeriFlow application homepage](docs/images/landing.png)
 
 [Get started](#run-locally) · [Deployment](docs/DEPLOYMENT.md) · [Judge walkthrough](docs/DEMO.md) · [Devpost answers](docs/DEVPOST.md) · [Test evidence](docs/TEST_RESULTS.md) · [MIT license](LICENSE)
@@ -23,9 +29,11 @@ Freelance payment disputes often begin with an unclear definition of done. VeriF
 
 **Verification boundary:** the local workflow and automated provider contracts are tested. Without credentials, AI runs in visibly labeled deterministic mock mode and checkout is disabled. A real OpenAI adapter and real PayPal Sandbox adapter are implemented; actual credential-backed AI requests and buyer-approved captures remain to be verified. This is a hackathon application, not a live payment service, escrow or freelancer payout system.
 
-## The implemented flow
+## Flowchart 2: How the app functions
 
-![Six-step agreement, delivery, AI review, human approval and verified payment workflow](docs/images/workflow.svg)
+Follow the arrows from sign-in to a paid milestone. Decision diamonds show approval branches, revision loops, checkout cancellation and payment reconciliation. Repeat the process for remaining milestones.
+
+![App functioning flowchart: sign in, create project, define milestones, submit evidence, review, approve or revise, buyer checkout, server verification and paid receipt](docs/images/app-functioning-flowchart.svg)
 
 1. A client creates a project, sets a budget and assigns a registered freelancer.
 2. The client reviews an AI milestone proposal or writes milestones manually.
