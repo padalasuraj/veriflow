@@ -5,8 +5,7 @@ import { z } from 'zod';
 import { rateLimit } from 'express-rate-limit';
 import type { Database } from '../config/database.js';
 import type { Config } from '../config/env.js';
-import { cookieName, cookieOptions, hashToken, identity, newSession, protect, publicUser } from '../middleware/auth.js';
-import { removeExpiredDemos } from '../services/demo-workspaces.js';
+import { cookieName, cookieOptions, demoCookieDuration, demoSessionDuration, hashToken, identity, newSession, protect, publicUser } from '../middleware/auth.js';
 import { requireCondition } from '../utils/errors.js';
 
 const credentials = z.object({ email: z.email().max(254).transform(s => s.toLowerCase()), password: z.string().min(10).max(72).refine(s => Buffer.byteLength(s) <= 72, 'Password must be at most 72 UTF-8 bytes.') });
@@ -19,24 +18,26 @@ export function authRoutes(db: Database, config: Config) {
   const router = Router();
   const limit = rateLimit({ windowMs: 15 * 60_000, limit: config.NODE_ENV === 'test' ? 1000 : 30, message: { error: { code: 'AUTH_RATE_LIMIT', message: 'Too many sign-in attempts. Try again later.' } } });
   const demoLimit = rateLimit({ windowMs: 60 * 60_000, limit: config.NODE_ENV === 'test' ? 1000 : 10, message: { error: { code: 'DEMO_RATE_LIMIT', message: 'Too many demo workspaces were started from this connection. Try again later.' } } });
-  const issue = async (userId: string, res: import('express').Response, maxAge = 7 * 86400_000) => {
-    const session = await newSession(db, userId);
+  const issue = async (userId: string, res: import('express').Response, maxAge = 7 * 86400_000, sessionDuration = maxAge) => {
+    const session = await newSession(db, userId, sessionDuration);
     res.cookie(cookieName(config), session.token, { ...cookieOptions(config), maxAge });
     return session.csrfToken;
   };
   router.post('/demo', demoLimit, async (req, res) => {
-    await removeExpiredDemos(db);
+    if (req.identity?.isDemo) {
+      res.json({ data: { user: sessionUser(req.identity), csrfToken: req.identity.csrfToken } });
+      return;
+    }
     if (req.identity) await db.session.deleteMany({ where: { tokenHash: hashToken(req.cookies[cookieName(config)]) } });
     const demoGroupId = randomUUID();
-    const demoExpiresAt = new Date(Date.now() + 24 * 60 * 60_000);
     const client = await db.$transaction(async tx => {
       const client = await tx.user.create({ data: {
         name: 'Demo Client', email: `${demoGroupId}.client@demo.invalid`, passwordHash: 'DEMO_SESSION_ONLY',
-        role: 'CLIENT', isDemo: true, demoGroupId, demoExpiresAt,
+        role: 'CLIENT', isDemo: true, demoGroupId,
       } });
       const freelancer = await tx.user.create({ data: {
         name: 'Demo Freelancer', email: `${demoGroupId}.freelancer@demo.invalid`, passwordHash: 'DEMO_SESSION_ONLY',
-        role: 'FREELANCER', isDemo: true, demoGroupId, demoExpiresAt,
+        role: 'FREELANCER', isDemo: true, demoGroupId,
       } });
       await tx.project.create({ data: {
         title: 'Studio website launch', description: 'Design and build an accessible, responsive website for a small creative studio.',
@@ -48,22 +49,21 @@ export function authRoutes(db: Database, config: Config) {
           { title: 'Frontend Implementation', description: 'Implement the approved website with React.', sequence: 2, amountMinor: 25000, acceptanceCriteria: ['Navigation is keyboard accessible.', 'Contact form validates email and required fields.', 'Layout adapts at 390px and 1440px.'] },
           { title: 'Final Delivery', description: 'Deliver tested source and handover documentation.', sequence: 3, amountMinor: 20000, acceptanceCriteria: ['Provide reproducible build and test commands.', 'Deliver source repository and deployment instructions.'] },
         ] },
-        auditLogs: { create: { actorId: client.id, eventType: 'DEMO_PROJECT_STARTED', metadataJson: { expiresAt: demoExpiresAt.toISOString() } } },
+        auditLogs: { create: { actorId: client.id, eventType: 'DEMO_PROJECT_STARTED', metadataJson: { persistentDemo: true } } },
       } });
       return client;
     });
-    const csrfToken = await issue(client.id, res, 24 * 60 * 60_000);
+    const csrfToken = await issue(client.id, res, demoCookieDuration, demoSessionDuration);
     res.status(201).json({ data: { user: sessionUser(client), csrfToken } });
   });
   router.post('/demo-role', protect, async (req, res) => {
     const current = identity(req);
-    requireCondition(current.isDemo && current.demoGroupId && current.demoExpiresAt && current.demoExpiresAt.getTime() > Date.now(), 403, 'DEMO_ONLY', 'Role switching is only available in a demo workspace.');
+    requireCondition(current.isDemo && current.demoGroupId, 403, 'DEMO_ONLY', 'Role switching is only available in a demo workspace.');
     const { role } = z.object({ role: z.enum(['CLIENT', 'FREELANCER']) }).parse(req.body);
-    const partner = await db.user.findFirst({ where: { demoGroupId: current.demoGroupId, isDemo: true, role, demoExpiresAt: { gt: new Date() } } });
+    const partner = await db.user.findFirst({ where: { demoGroupId: current.demoGroupId, isDemo: true, role } });
     requireCondition(partner, 404, 'DEMO_ROLE_NOT_FOUND', 'The requested demo role is unavailable.');
     await db.session.deleteMany({ where: { tokenHash: hashToken(req.cookies[cookieName(config)]) } });
-    const remaining = current.demoExpiresAt.getTime() - Date.now();
-    const csrfToken = await issue(partner.id, res, remaining);
+    const csrfToken = await issue(partner.id, res, demoCookieDuration, demoSessionDuration);
     res.json({ data: { user: sessionUser(partner), csrfToken } });
   });
   router.post('/register', limit, async (req, res) => {

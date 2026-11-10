@@ -5,7 +5,8 @@ test('visitor completes the demo workflow without creating an account', async ({
   await page.goto('/');
   await page.getByRole('button', { name: 'Try the demo without an account' }).click();
   await expect(page.getByRole('heading', { name: 'Hello, Demo.' })).toBeVisible();
-  await expect(page.getByText('Temporary demo workspace')).toBeVisible();
+  await expect(page.getByText('Persistent demo workspace')).toBeVisible();
+  await expect(page.getByText(/saved and does not expire/i)).toBeVisible();
 
   await page.getByRole('link', { name: /UI Design/ }).click();
   const milestoneUrl = page.url();
@@ -26,4 +27,7 @@ test('visitor completes the demo workflow without creating an account', async ({
   await page.getByRole('button', { name: 'Record client decision' }).click();
   await expect(page.getByText('Checkout is disabled in the account-free demo.')).toBeVisible();
   expect(page.url()).toContain(milestoneUrl.split('/').pop());
+  await page.reload();
+  await expect(page.getByText('approved', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Evidence assessment' })).toBeVisible();
 });

@@ -31,7 +31,6 @@ model User {
   role         Role
   isDemo       Boolean @default(false)
   demoGroupId  String?
-  demoExpiresAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   sessions     Session[]
@@ -40,7 +39,6 @@ model User {
   submissions  Submission[]
   approvals    Approval[]
   auditLogs    AuditLog[]
-  @@index([isDemo, demoExpiresAt])
   @@index([demoGroupId, role])
 }
 

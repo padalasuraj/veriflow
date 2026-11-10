@@ -109,6 +109,7 @@ describe('account-free demo workspaces', () => {
     const started = await guest.post('/api/auth/demo').expect(201);
     expect(started.body.data.user).toMatchObject({ name: 'Demo Client', role: 'CLIENT', isDemo: true });
     expect(started.body.data.user.demoGroupId).toBeUndefined();
+    expect(started.headers['set-cookie'][0]).toContain('Max-Age=34560000');
     let demo: Login = { agent: guest, csrf: started.body.data.csrfToken, id: started.body.data.user.id, email: started.body.data.user.email };
     const seeded = await guest.get('/api/projects').expect(200);
     expect(seeded.body.data).toHaveLength(1);
@@ -138,11 +139,12 @@ describe('account-free demo workspaces', () => {
     expect((await secondGuest.get('/api/projects').expect(200)).body.data).toHaveLength(1);
     expect((await guest.get('/api/projects').expect(200)).body.data).toHaveLength(2);
     const demoUser = await db.user.findUniqueOrThrow({ where: { id: second.body.data.user.id } });
-    await db.user.updateMany({ where: { demoGroupId: demoUser.demoGroupId }, data: { demoExpiresAt: new Date(0) } });
-    const thirdGuest = request.agent(app);
-    await thirdGuest.post('/api/auth/demo').expect(201);
-    expect(await db.user.count({ where: { demoGroupId: demoUser.demoGroupId } })).toBe(0);
-    expect(await db.project.count({ where: { clientId: demoUser.id } })).toBe(0);
+    const demoSession = await db.session.findFirstOrThrow({ where: { userId: demoUser.id } });
+    expect(demoSession.expiresAt.getTime()).toBeGreaterThan(Date.now() + 90 * 365 * 24 * 60 * 60_000);
+    const resumed = await guest.post('/api/auth/demo').expect(200);
+    expect(resumed.body.data.user.id).toBe(started.body.data.user.id);
+    expect(await db.user.count({ where: { demoGroupId: demoUser.demoGroupId } })).toBe(2);
+    expect(await db.project.count({ where: { clientId: demoUser.id } })).toBe(1);
   });
   it('does not allow normal accounts to switch demo roles', async () => {
     await post(client, '/api/auth/demo-role', { role: 'FREELANCER' }).expect(403);

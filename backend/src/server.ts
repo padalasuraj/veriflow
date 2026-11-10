@@ -2,7 +2,6 @@ import 'dotenv/config';
 import { createApp } from './app.js';
 import { envSchema } from './config/env.js';
 import { db } from './config/database.js';
-import { removeExpiredDemos } from './services/demo-workspaces.js';
 
 const result = envSchema.safeParse(process.env);
 if (!result.success) {
@@ -16,16 +15,6 @@ try {
   await db.$disconnect();
   process.exit(1);
 }
-try {
-  await removeExpiredDemos(db);
-} catch (error) {
-  console.error('Expired demo workspace cleanup failed. Check the database before starting the API.', error);
-  await db.$disconnect();
-  process.exit(1);
-}
-const demoCleanupTimer = setInterval(() => {
-  void removeExpiredDemos(db).catch(error => console.error('Expired demo workspace cleanup failed.', error));
-}, 60 * 60_000);
 const server = createApp(result.data).listen(result.data.PORT, () => {
   console.log(`VeriFlow API listening on http://localhost:${result.data.PORT}`);
   console.log(`AI mode: ${result.data.AI_MODE === 'mock' ? 'MOCK (simulated)' : 'REAL (requires provider access)'}. PayPal: Sandbox only.`);
@@ -33,7 +22,6 @@ const server = createApp(result.data).listen(result.data.PORT, () => {
 server.on('error', () => { console.error('API could not start. Check that the configured port is available.'); process.exit(1); });
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
-    clearInterval(demoCleanupTimer);
     server.close(() => { void db.$disconnect().finally(() => process.exit(0)); });
     setTimeout(() => process.exit(1), 5000).unref();
   });
