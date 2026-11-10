@@ -103,6 +103,51 @@ describe('authentication and private project access', () => {
     await post(stranger, `/api/milestones/${m}/decision`, {}).expect(404);
   });
 });
+describe('account-free demo workspaces', () => {
+  it('supports both roles in an isolated workspace and blocks real checkout', async () => {
+    const guest = request.agent(app);
+    const started = await guest.post('/api/auth/demo').expect(201);
+    expect(started.body.data.user).toMatchObject({ name: 'Demo Client', role: 'CLIENT', isDemo: true });
+    expect(started.body.data.user.demoGroupId).toBeUndefined();
+    let demo: Login = { agent: guest, csrf: started.body.data.csrfToken, id: started.body.data.user.id, email: started.body.data.user.email };
+    const seeded = await guest.get('/api/projects').expect(200);
+    expect(seeded.body.data).toHaveLength(1);
+    expect(seeded.body.data[0].milestones).toHaveLength(3);
+
+    const created = await post(demo, '/api/projects', { title: 'Demo project', description: 'A project created without signing up.', requirements: 'Review at mobile and desktop sizes.', deliverables: 'A working responsive site.', budgetMinor: 12000, currency: 'USD' }).expect(201);
+    expect(created.body.data.freelancerId).toBeTruthy();
+    const milestoneResponse = await post(demo, `/api/projects/${created.body.data.id}/milestones`, { title: 'Demo delivery', description: 'Deliver a responsive first version.', amountMinor: 12000, acceptanceCriteria: ['Provide the responsive implementation.'] }).expect(201);
+    const milestoneId = milestoneResponse.body.data.id as string;
+
+    const switched = await post(demo, '/api/auth/demo-role', { role: 'FREELANCER' }).expect(200);
+    expect(switched.body.data.user).toMatchObject({ role: 'FREELANCER', isDemo: true });
+    demo = { ...demo, csrf: switched.body.data.csrfToken };
+    const submission = await post(demo, `/api/milestones/${milestoneId}/submissions`, evidence).expect(201);
+
+    const switchedBack = await post(demo, '/api/auth/demo-role', { role: 'CLIENT' }).expect(200);
+    demo = { ...demo, csrf: switchedBack.body.data.csrfToken };
+    await post(demo, `/api/milestones/${milestoneId}/review`).expect(200);
+    const evaluation = await post(demo, `/api/ai/submissions/${submission.body.data.id}/evaluate`).expect(201);
+    expect(evaluation.body.data.provider).toBe('mock');
+    await post(demo, `/api/milestones/${milestoneId}/decision`, { submissionId: submission.body.data.id, decision: 'APPROVED', notes: 'Reviewed the demo submission.' }).expect(201);
+    await post(demo, '/api/payments/orders', { milestoneId }).expect(403).then(response => expect(response.body.error.code).toBe('DEMO_CHECKOUT_DISABLED'));
+    expect(gateway.create).not.toHaveBeenCalled();
+
+    const secondGuest = request.agent(app);
+    const second = await secondGuest.post('/api/auth/demo').expect(201);
+    expect((await secondGuest.get('/api/projects').expect(200)).body.data).toHaveLength(1);
+    expect((await guest.get('/api/projects').expect(200)).body.data).toHaveLength(2);
+    const demoUser = await db.user.findUniqueOrThrow({ where: { id: second.body.data.user.id } });
+    await db.user.updateMany({ where: { demoGroupId: demoUser.demoGroupId }, data: { demoExpiresAt: new Date(0) } });
+    const thirdGuest = request.agent(app);
+    await thirdGuest.post('/api/auth/demo').expect(201);
+    expect(await db.user.count({ where: { demoGroupId: demoUser.demoGroupId } })).toBe(0);
+    expect(await db.project.count({ where: { clientId: demoUser.id } })).toBe(0);
+  });
+  it('does not allow normal accounts to switch demo roles', async () => {
+    await post(client, '/api/auth/demo-role', { role: 'FREELANCER' }).expect(403);
+  });
+});
 describe('budget, revision and decision workflow', () => {
   it('enforces integer budgets, allocation totals and agreement locks', async () => {
     const p = await project(); const m = await milestone(p, 60000);

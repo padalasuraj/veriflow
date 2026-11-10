@@ -19,6 +19,7 @@ export function paymentRoutes(db: Database, gateway: PayPalGateway) {
   });
   router.post('/orders', async (req, res) => {
     const user = requireRole(req, 'CLIENT');
+    requireCondition(!user.isDemo, 403, 'DEMO_CHECKOUT_DISABLED', 'Sandbox checkout is disabled in account-free demo workspaces.');
     const { milestoneId } = z.object({ milestoneId: z.string().min(1) }).parse(req.body);
     const { milestone, project } = await milestoneAccess(db, milestoneId, user, true);
     requireCondition(gateway.configured, 503, 'PAYPAL_UNCONFIGURED', 'Configure PayPal Sandbox credentials on the backend to enable checkout.');
@@ -46,6 +47,7 @@ export function paymentRoutes(db: Database, gateway: PayPalGateway) {
   });
   router.post('/orders/:orderId/capture', async (req, res) => {
     const user = requireRole(req, 'CLIENT');
+    requireCondition(!user.isDemo, 403, 'DEMO_CHECKOUT_DISABLED', 'Sandbox checkout is disabled in account-free demo workspaces.');
     const orderId = z.string().regex(/^[A-Za-z0-9-]{3,100}$/).parse(req.params.orderId);
     let payment = await db.payment.findUnique({ where: { paypalOrderId: orderId } });
     requireCondition(payment, 404, 'NOT_FOUND', 'Order not found.');

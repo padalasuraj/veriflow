@@ -1,4 +1,4 @@
-export interface User { id: string; name: string; email: string; role: 'CLIENT' | 'FREELANCER' }
+export interface User { id: string; name: string; email: string; role: 'CLIENT' | 'FREELANCER'; isDemo: boolean }
 export interface Session { user: User; csrfToken: string }
 export type Status = 'DRAFT' | 'OPEN' | 'SUBMITTED' | 'UNDER_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED' | 'PAYMENT_PENDING' | 'PAYMENT_FAILED' | 'PAID';
 export interface Project { id: string; title: string; description: string; requirements: string; deliverables: string; currency: string; budgetMinor: number; clientId: string; freelancerId: string | null; freelancer?: { id: string; name: string } | null; client?: { id: string; name: string }; milestones: Milestone[] }

@@ -4,7 +4,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { api, ApiError, setCsrfToken } from '../services/api';
 import type { Session, User } from '../types/domain';
 
-const AuthContext = createContext<{ user: User; logout: () => Promise<void> } | null>(null);
+const AuthContext = createContext<{ user: User; logout: () => Promise<void>; switchDemoRole: () => Promise<void>; error: string } | null>(null);
 export const useAuth = () => {
   const auth = useContext(AuthContext);
   if (!auth) throw new Error('Authentication context is missing.');
@@ -14,6 +14,7 @@ export function Protected({ children }: { children: ReactNode }) {
   const client = useQueryClient();
   const location = useLocation();
   const [logoutError, setLogoutError] = useState('');
+  const [roleError, setRoleError] = useState('');
   const session = useQuery({ queryKey: ['session'], queryFn: async () => {
     const data = await api<Session>('/auth/me');
     setCsrfToken(data.csrfToken);
@@ -29,8 +30,18 @@ export function Protected({ children }: { children: ReactNode }) {
       await api('/auth/logout', { method: 'POST' });
       setCsrfToken('');
       client.clear();
-      window.location.assign('/login');
+      window.location.assign(session.data.user.isDemo ? '/' : '/login');
     } catch (error) { setLogoutError(error instanceof Error ? error.message : 'Logout failed.'); }
   };
-  return <AuthContext.Provider value={{ user: session.data.user, logout }}>{logoutError && <p role="alert">{logoutError}</p>}{children}</AuthContext.Provider>;
+  const switchDemoRole = async () => {
+    setRoleError('');
+    try {
+      const role = session.data.user.role === 'CLIENT' ? 'FREELANCER' : 'CLIENT';
+      const next = await api<Session>('/auth/demo-role', { method: 'POST', body: { role } });
+      setCsrfToken(next.csrfToken);
+      client.setQueryData(['session'], next);
+      await client.invalidateQueries({ predicate: query => query.queryKey[0] !== 'session' });
+    } catch (error) { setRoleError(error instanceof Error ? error.message : 'Could not switch demo role.'); }
+  };
+  return <AuthContext.Provider value={{ user: session.data.user, logout, switchDemoRole, error: roleError }}>{logoutError && <p role="alert">{logoutError}</p>}{children}</AuthContext.Provider>;
 }

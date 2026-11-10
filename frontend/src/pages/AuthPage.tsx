@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { api, setCsrfToken } from '../services/api';
 import type { Session } from '../types/domain';
 import { ErrorNotice, Field } from '../components/ui/Common';
+import { DemoButton } from '../components/auth/DemoButton';
 
 const schema = z.object({ name: z.string().optional(), email: z.email(), password: z.string().min(10, 'Use at least 10 characters.').max(72), role: z.enum(['CLIENT', 'FREELANCER']) });
 export function AuthPage({ registerMode = false }: { registerMode?: boolean }) {
@@ -29,5 +30,5 @@ export function AuthPage({ registerMode = false }: { registerMode?: boolean }) {
     {registerMode && <Field label="I am a"><select {...register('role')}><option value="CLIENT">Client</option><option value="FREELANCER">Freelancer</option></select></Field>}
     {Object.entries(errors).map(([key, e]) => <p className="error-notice" key={key} role="alert">{e.message}</p>)}<ErrorNotice error={error}/>
     <button className="button" disabled={isSubmitting}>{isSubmitting ? 'Please wait...' : registerMode ? 'Create account' : 'Sign in'}</button></form>
-    <p>{registerMode ? 'Already registered?' : 'New to VeriFlow?'} <Link className="text-link" to={registerMode ? '/login' : '/register'}>{registerMode ? 'Sign in' : 'Create an account'}</Link></p><p className="muted">Local demo accounts are documented in the README. Use PayPal Sandbox accounts only for checkout.</p></section></main>;
+    <p>{registerMode ? 'Already registered?' : 'New to VeriFlow?'} <Link className="text-link" to={registerMode ? '/login' : '/register'}>{registerMode ? 'Sign in' : 'Create an account'}</Link></p><div className="demo-divider"><span>or explore first</span></div><DemoButton className="button secondary demo-button"/><p className="muted">The demo creates a temporary workspace; no email or password is needed.</p></section></main>;
 }

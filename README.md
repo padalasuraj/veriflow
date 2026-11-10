@@ -26,6 +26,7 @@ Freelance payment disputes often begin with an unclear definition of done. VeriF
 - **PayPal Sandbox checkout:** server-created orders, buyer approval, idempotent capture and exact amount/currency verification.
 - **Persistent history:** shared audit events, decisions, payment attempts and receipts, protected by participant authorization.
 - **Responsive interface:** desktop and mobile project views, accessible labels and clear loading/error states.
+- **Account-free interactive demo:** visitors can start a temporary, isolated client/freelancer workspace without credentials and switch roles to explore the workflow. Demo AI is always simulated, demo checkout is disabled, and workspaces expire after 24 hours.
 
 **Verification boundary:** the local workflow and automated provider contracts are tested. Without credentials, AI runs in visibly labeled deterministic mock mode and checkout is disabled. A real OpenAI adapter and real PayPal Sandbox adapter are implemented; actual credential-backed AI requests and buyer-approved captures remain to be verified. This is a hackathon application, not a live payment service, escrow or freelancer payout system.
 
@@ -85,6 +86,8 @@ npm.cmd run dev
 Open **http://localhost:5173**. API health: **http://localhost:3001/api/health**. Keep the terminal running; Ctrl+C stops both services. On macOS/Linux use `npm` and `cp -n backend/.env.example backend/.env` instead of the PowerShell copy command. On Windows, `npm.cmd` avoids PowerShell script execution-policy errors.
 
 ### Local demo accounts
+
+Visitors can also choose **Try the demo without an account** from the landing or sign-in page. This starts an isolated temporary workspace with a sample project, lets you switch between client and freelancer views, and automatically removes demo data after 24 hours. No email, password, or PayPal account is needed. AI remains simulated and checkout is disabled in this mode.
 
 | Role | Email | Password |
 | --- | --- | --- |

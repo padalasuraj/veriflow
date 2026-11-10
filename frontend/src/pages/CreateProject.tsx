@@ -24,5 +24,5 @@ export function CreateProject() {
     <Field label="Requirements"><textarea required minLength={3} maxLength={8000} {...register('requirements')}/></Field>
     <Field label="Deliverables"><textarea required minLength={3} maxLength={4000} {...register('deliverables')}/></Field>
     <div className="two-column"><Field label="Budget in minor units"><input required type="number" min={1} max={100000000} step={1} {...register('budgetMinor', { valueAsNumber: true })}/></Field><Field label="Currency"><select {...register('currency')}>{['USD', 'EUR', 'GBP', 'CAD', 'AUD'].map(c => <option key={c}>{c}</option>)}</select></Field></div>
-    <Field label="Freelancer email (optional)"><input type="email" {...register('freelancerEmail')}/></Field><p className="muted">The freelancer must register first. You can assign them later.</p><ErrorNotice error={error}/><button className="button" disabled={isSubmitting}>{isSubmitting ? 'Creating...' : 'Create project'}</button></form></>;
+    {!user.isDemo && <><Field label="Freelancer email (optional)"><input type="email" {...register('freelancerEmail')}/></Field><p className="muted">The freelancer must register first. You can assign them later.</p></>}<ErrorNotice error={error}/><button className="button" disabled={isSubmitting}>{isSubmitting ? 'Creating...' : 'Create project'}</button></form></>;
 }

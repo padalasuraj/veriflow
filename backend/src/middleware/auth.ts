@@ -5,8 +5,9 @@ import type { Database } from '../config/database.js';
 import type { Config } from '../config/env.js';
 import { ApiError, requireCondition } from '../utils/errors.js';
 
-export const publicUser = { id: true, name: true, email: true, role: true } as const;
-export type Identity = { id: string; name: string; email: string; role: Role; csrfToken: string };
+export const publicUser = { id: true, name: true, email: true, role: true, isDemo: true } as const;
+const identityUser = { ...publicUser, demoGroupId: true, demoExpiresAt: true } as const;
+export type Identity = { id: string; name: string; email: string; role: Role; isDemo: boolean; demoGroupId: string | null; demoExpiresAt: Date | null; csrfToken: string };
 declare module 'express-serve-static-core' {
   interface Request { identity?: Identity }
 }
@@ -25,8 +26,8 @@ export function authentication(db: Database, config: Config): RequestHandler {
   return async (req, _res, next) => {
     const token: unknown = req.cookies?.[cookieName(config)];
     if (typeof token === 'string' && /^[a-f0-9]{64}$/.test(token)) {
-      const session = await db.session.findUnique({ where: { tokenHash: hashToken(token) }, include: { user: { select: publicUser } } });
-      if (session && session.expiresAt.getTime() > Date.now()) req.identity = { ...session.user, csrfToken: session.csrfToken };
+      const session = await db.session.findUnique({ where: { tokenHash: hashToken(token) }, include: { user: { select: identityUser } } });
+      if (session && session.expiresAt.getTime() > Date.now() && (!session.user.isDemo || (session.user.demoExpiresAt && session.user.demoExpiresAt.getTime() > Date.now()))) req.identity = { ...session.user, csrfToken: session.csrfToken };
     }
     next();
   };
@@ -52,6 +53,7 @@ export function csrf(config: Config): RequestHandler {
     const origin = req.get('origin');
     requireCondition(!origin || origin === config.FRONTEND_ORIGIN, 403, 'CSRF', 'Request origin is not allowed.');
     requireCondition(req.get('sec-fetch-site') !== 'cross-site', 403, 'CSRF', 'Cross-site request rejected.');
+    if (req.method === 'POST' && req.path === '/api/auth/demo') return next();
     if (req.identity) {
       const token = req.get('x-csrf-token') ?? '';
       const expected = req.identity.csrfToken;

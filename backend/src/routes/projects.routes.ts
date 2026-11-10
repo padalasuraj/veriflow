@@ -28,12 +28,14 @@ export function projectRoutes(db: Database) {
   router.post('/', async (req, res) => {
     const user = requireRole(req, 'CLIENT');
     const input = projectSchema.parse(req.body);
-    const freelancer = input.freelancerEmail ? await db.user.findUnique({ where: { email: input.freelancerEmail.toLowerCase() } }) : null;
+    const demoFreelancer = user.isDemo ? await db.user.findFirst({ where: { demoGroupId: user.demoGroupId, isDemo: true, role: 'FREELANCER' } }) : null;
+    const freelancer = user.isDemo ? demoFreelancer : input.freelancerEmail ? await db.user.findUnique({ where: { email: input.freelancerEmail.toLowerCase() } }) : null;
+    requireCondition(!user.isDemo || (freelancer && (!input.freelancerEmail || input.freelancerEmail.toLowerCase() === freelancer.email)), 403, 'DEMO_ASSIGNMENT_RESTRICTED', 'Demo projects can only be assigned to the demo freelancer.');
     requireCondition(!input.freelancerEmail || freelancer?.role === 'FREELANCER', 400, 'INVALID_FREELANCER', 'Use the email of a registered freelancer.');
     const { freelancerEmail: _email, ...data } = input;
     void _email;
     const project = await db.$transaction(async tx => {
-      const created = await tx.project.create({ data: { ...data, clientId: user.id, freelancerId: freelancer?.id } });
+      const created = await tx.project.create({ data: { ...data, clientId: user.id, freelancerId: freelancer?.id ?? null } });
       await tx.auditLog.create({ data: audit(user.id, created.id, 'PROJECT_CREATED') });
       return created;
     });
@@ -48,7 +50,9 @@ export function projectRoutes(db: Database) {
     const user = requireRole(req, 'CLIENT');
     const project = await projectAccess(db, String(req.params.id), user, true);
     const input = projectSchema.partial().parse(req.body);
-    const freelancer = input.freelancerEmail ? await db.user.findUnique({ where: { email: input.freelancerEmail.toLowerCase() } }) : null;
+    const demoFreelancer = user.isDemo && input.freelancerEmail ? await db.user.findFirst({ where: { demoGroupId: user.demoGroupId, isDemo: true, role: 'FREELANCER' } }) : null;
+    const freelancer = user.isDemo ? demoFreelancer : input.freelancerEmail ? await db.user.findUnique({ where: { email: input.freelancerEmail.toLowerCase() } }) : null;
+    requireCondition(!user.isDemo || !input.freelancerEmail || (freelancer && input.freelancerEmail.toLowerCase() === freelancer.email), 403, 'DEMO_ASSIGNMENT_RESTRICTED', 'Demo projects can only be assigned to the demo freelancer.');
     requireCondition(!input.freelancerEmail || freelancer?.role === 'FREELANCER', 400, 'INVALID_FREELANCER', 'Use the email of a registered freelancer.');
     const { freelancerEmail, ...data } = input;
     const updated = await db.$transaction(async tx => {
